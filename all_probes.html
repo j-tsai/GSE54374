@@ -1,0 +1,132 @@
+<html>
+	<head>
+	 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script type="text/javascript">
+    
+	google.load("visualization", '1', {packages:['control']});
+	google.setOnLoadCallback(drawChart);
+
+	function drawChart() {
+
+  		var jsonData = $.ajax({
+          url: "cb_sem.php",
+          dataType:"json",
+          async: false
+          }).responseText;
+    
+      	// Create our data table out of JSON data loaded from server.
+      	var data = new google.visualization.DataTable(jsonData);
+  		
+  		var columnsTable = new google.visualization.DataTable();
+    	columnsTable.addColumn('number', 'colIndex');
+	    columnsTable.addColumn('string', 'colLabel');
+    	var initState= {selectedValues: []};
+    	// put the columns into this data table (skip column 0)
+    	for (var i = 2; i < data.getNumberOfColumns(); i++) {
+        	columnsTable.addRow([i, data.getColumnLabel(i)]);
+        }  		
+		initState.selectedValues.push(data.getColumnLabel(2));
+        
+        var table = new google.visualization.ChartWrapper({
+          	'chartType': 'Table',
+          	'containerId': 'table_div',
+          	'options': {
+            	//'width': '500px',
+            	'alternatingRowStyle':true,
+            	'page':'enable',
+            	'pageSize':100
+        	}
+        });
+        
+        
+        var stringFilter_gene = new google.visualization.ControlWrapper({
+          	'controlType': 'StringFilter',
+          	'containerId': 'string_gene_div',
+          	'dataTable':data,
+          	'options': {
+          		'filterColumnLabel': 'GeneSymbol',
+          		'ui': {'labelStacking': 'vertical', 'label' : 'Gene Symbol','realtimeTrigger':false},
+          		'matchType' : 'prefix'
+	        },
+	        'state': {'value' :'R'}
+        });
+
+        
+  		var chart = new google.visualization.ChartWrapper({
+          	'chartType': 'ColumnChart',
+          	'containerId': 'chart_div',
+          	'options': {
+            	'height': 500,
+            	'pointSize':5,
+             	'colors':['black'],
+            	'legend': 'bottom',
+            	'tooltip' : {trigger: 'selection'}, //disable tooltip: hovering
+            	vAxis : {format : '0',title : 'log2RMA',titleTextStyle : {italic : false}},
+            	explorer: { actions: ['dragToZoom', 'rightClickToReset'] },
+             },
+             view: {'columns': [1,2,26,3,4,26,5,6,26,7,8,26,9,10,26,11,12,26,13,14,26,15,16,26,17,18,26,19,20,26,21,22,26,23,24,26,25]}
+        });
+        
+        var columnFilter = new google.visualization.ControlWrapper({
+        controlType: 'CategoryFilter',
+        containerId: 'colFilter_div',
+        dataTable: columnsTable,
+        options: {
+            filterColumnLabel: 'colLabel',
+            ui: {
+                label: 'Columns',
+                allowTyping: false,
+                allowMultiple: true,
+                allowNone: false,
+                selectedValuesLayout: 'belowStacked'
+            }
+        },
+        state: initState
+    });
+
+  		//Create dashboard
+  		var dashboard = new google.visualization.Dashboard(document.getElementById('dashboard'))
+       .bind([stringFilter_gene,chart);   
+    	
+        function setChartView () {
+        	var state = columnFilter.getState();
+        	var row;
+        	var view = {
+            	columns: [1]
+        	};
+        	for (var i = 0; i < state.selectedValues.length; i++) {
+            	row = columnsTable.getFilteredRows([{column: 1, value: state.selectedValues[i]}])[0];
+            	view.columns.push(columnsTable.getValue(row, 0));
+           // 	view.columns.push(columnsTable.getValue(zero, 0));
+           //     view.columns.push(columnsTable.getValue(row+1, 0));
+            }
+        // sort the indices into their original order
+        	view.columns.sort(function (a, b) {
+            	return (a - b);
+        	});
+        	chart.setView(view);
+        	chart.draw();
+    }
+    google.visualization.events.addListener(columnFilter, 'statechange', setChartView);
+    var runOnce = google.visualization.events.addListener(dashboard, 'ready', function () {
+        google.visualization.events.removeListener(runOnce);
+        setChartView();
+    });
+
+    
+    columnFilter.draw();
+    dashboard.draw(data);
+}
+        
+
+</script>
+</head>
+<body>
+	<div id="dashboard"></div>
+    	<div id="colFilter_div"></div>
+      	<div id="string_gene_div"></div>
+      	<div id="chart_div"></div>
+    	
+  </body>
+</html>
