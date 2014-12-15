@@ -1,0 +1,184 @@
+<html>
+	<head>
+	 <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <script type="text/javascript">
+    
+google.load('visualization', '1', {packages: ['controls']});
+google.setOnLoadCallback(drawChart);
+
+function drawChart () {
+    var jsonData = $.ajax({
+          url: "cb_sem.php",
+          dataType:"json",
+          async: false
+          }).responseText;
+    
+      	// Create our data table out of JSON data loaded from server.
+      	var data = new google.visualization.DataTable(jsonData);
+
+    var columnsTable = new google.visualization.DataTable();
+    columnsTable.addColumn('number', 'colIndex');
+    columnsTable.addColumn('string', 'colLabel');
+    var initState= {selectedValues: []};
+    // put the columns into this data table (skip column 0)
+    for (var i = 2; i < data.getNumberOfColumns(); i++) {
+        columnsTable.addRow([i, data.getColumnLabel(i)]);
+    }
+    initState.selectedValues.push(data.getColumnLabel(18));
+    initState.selectedValues.push(data.getColumnLabel(20));
+    initState.selectedValues.push(data.getColumnLabel(22));
+    initState.selectedValues.push(data.getColumnLabel(24));
+    
+    var gene_filter = new google.visualization.ControlWrapper({
+        controlType: 'StringFilter',
+        containerId: 'gene_div',
+        dataTable: data,
+        options: {
+            filterColumnLabel: 'GeneSymbol',
+            ui: {
+                labelStacking: 'vertical',
+                allowTyping: false,
+                allowMultiple: true,
+                realtimeTrigger:false
+            }
+        }    
+    });
+    var probe_filter = new google.visualization.ControlWrapper({
+        controlType: 'StringFilter',
+        containerId: 'probe_div',
+        dataTable: data,
+        options: {
+            filterColumnLabel: 'AffyID',
+            ui: {
+                labelStacking: 'vertical',
+                allowTyping: false,
+                allowMultiple: true,
+                realtimeTrigger:false
+            }
+        }    
+    });
+    
+    var chart = new google.visualization.ChartWrapper({
+          	'chartType': 'ColumnChart',
+          	'containerId': 'chart_div',
+          	'options': {
+            	//'width' : 1000,
+            	'height': 500,
+            	'pointSize':5,
+            	//'crosshair': { trigger: 'both' }, //not available in ColumnChart
+            	'colors':['black'],
+            	'legend': 'bottom',
+            	'tooltip' : {trigger: 'selection'}, //disable tooltip: hovering
+            	vAxis : {title : 'log2RMA',titleTextStyle : {italic : false}},
+            	explorer: { actions: ['dragToZoom', 'rightClickToReset'] }
+             },
+            'view': {'columns': [1,2,26,3,4,26,5,6,26,7,8,26,9,10,26,11,12,26,13,14,26,15,16,26,17,18,26,19,20,26,21,22,26,23,24,26,25]}
+    });
+
+  
+    
+    var columnFilter = new google.visualization.ControlWrapper({
+        controlType: 'CategoryFilter',
+        containerId: 'colFilter_div',
+        dataTable: columnsTable,
+        options: {
+            filterColumnLabel: 'colLabel',
+            ui: {
+                label: 'Conditions',
+                allowTyping: false,
+                allowMultiple: true,
+                allowNone: false,
+                selectedValuesLayout: 'belowStacked'
+            }
+        },
+        state: initState
+    });
+    
+    var rangeFilter = new google.visualization.ControlWrapper({ //Create range slider (eg. pvalues)
+          	'controlType': 'NumberRangeFilter',
+          	'containerId': 'range_div',
+          		'options': {
+            	'filterColumnLabel': 'MaleAdult_MIP',
+            	'ui' : {'label' : 'p-value/log2FC'}
+          	},
+          	"state": {"lowValue": 14, "highValue": 15}
+    });
+    
+    
+    var table = new google.visualization.ChartWrapper({
+          	'chartType': 'Table',
+          	'containerId': 'table_div',
+          	'options': {
+            	//'width': '500px',
+            	'alternatingRowStyle':true,
+            	'page':'enable',
+            	'pageSize':100
+        	},
+        	view:{columns:[0,1,2,4,6,8,10,12]}
+        });
+        
+    
+     var dashboard = new google.visualization.Dashboard(document.getElementById('dashboard')).
+    bind([rangeFilter,gene_filter,probe_filter], [table,chart]);
+    
+    
+    
+    function setChartView () {
+        var state = columnFilter.getState();
+        var row;
+        var view = {
+            columns: [1]
+        };
+        
+        //table shows the columns selected without the sem error bars
+        var view2 = {
+            columns: [0,1]
+        };
+        
+      
+        for (var i = 0; i < state.selectedValues.length; i++) {
+            row = columnsTable.getFilteredRows([{column: 1, value: state.selectedValues[i]}])[0];
+            view.columns.push(columnsTable.getValue(row, 0));
+           	view.columns.push(columnsTable.getValue(row+1, 0));
+           	
+           	//push the actual database rather than view column values
+           	//view.columns.push(26);
+           	view2.columns.push(columnsTable.getValue(row,0));
+           	
+        }
+        // sort the indices into their original order
+        view.columns.sort(function (a, b) {
+            return (a - b);
+        });
+        chart.setView(view);
+        table.setView(view2);
+        chart.draw();
+        table.draw();
+    }
+    google.visualization.events.addListener(columnFilter, 'statechange', setChartView);
+    var runOnce = google.visualization.events.addListener(dashboard, 'ready', function () {
+        google.visualization.events.removeListener(runOnce);
+        setChartView();
+    });
+    columnFilter.draw();
+    dashboard.draw(data);
+}
+
+
+   </script>
+</head>
+<body>
+<div id="dashboard"></div>
+<div id="colFilter_div"></div>
+<div id="chart_div"></div>
+<div id="gene_div"></div>
+<div id="probe_div"></div>
+<div id="range_div"></div>
+<div id="table_div"></div>
+
+<div id="creativeCommons" style="text-align: center; width: 400px;">
+      
+    </div>
+  </body>
+</html>
